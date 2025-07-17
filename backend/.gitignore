@@ -1,9 +1,0 @@
-# Ignore build and dist folders
-build/
-dist/
-
-# Optional: Ignore logs, compiled files, virtual environments, etc.
-*.log
-*.pyc
-__pycache__/
-venv/
