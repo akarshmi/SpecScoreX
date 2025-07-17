@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpecScoreX – The Smart System Rating Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+            <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.2/dist/ua-parser.min.js"></script>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container nav-container">
+            <div class="logo">SpecScoreX</div>
+            <ul class="nav-links">
+                <li><a href="#home">Home</a></li>
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#team">Team</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" onclick="toggleTheme()">🌓</button>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <span>⚡</span>
+                    New: AI-Powered System Analysis
+                </div>
+                <h1>Know Your System.<br>Rate It Smartly.</h1>
+                <p>Analyze your PC's specs and performance instantly with our advanced rating engine. Get detailed
+                    insights, optimization tips, and performance scores – no downloads, no login required.</p>
+                <div class="hero-buttons">
+                    <a href="#quick-scan" class="btn btn-primary">
+                        🚀 Quick Scan
+                    </a>
+                    <a href="#full-scan" class="btn btn-secondary">
+                        🔍 Full Analysis
+                    </a>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="hero-graphic"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="section bg-pattern" id="how-it-works">
+        <div class="container">
+            <h2 class="section-title">How SpecScoreX Works</h2>
+            <p class="section-subtitle">Get comprehensive system analysis in three simple steps</p>
+            <div class="steps">
+                <div class="step fade-in">
+                    <div class="step-number">1</div>
+                    <h3>Choose Your Method</h3>
+                    <p>Select between instant browser-based analysis or comprehensive system scanning with our secure
+                        agent for deeper insights.</p>
+                </div>
+                <div class="step fade-in">
+                    <div class="step-number">2</div>
+                    <h3>Analyze & Score</h3>
+                    <p>Our AI-powered engine evaluates your hardware components and generates detailed performance
+                        ratings across multiple categories.</p>
+                </div>
+                <div class="step fade-in">
+                    <div class="step-number">3</div>
+                    <h3>Get Recommendations</h3>
+                    <p>Receive personalized upgrade suggestions, optimization tips, and performance benchmarks tailored
+                        to your specific system.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Scan Options -->
+    <section class="section" style="background: var(--gray);">
+        <div class="container">
+            <h2 class="section-title">Choose Your Scan Type</h2>
+            <p class="section-subtitle">Two powerful ways to analyze your system performance</p>
+            <div class="scan-options">
+                <div class="scan-card fade-in" id="quick-scan">
+                    <h3>Quick Scan <span class="highlight">• Browser Only</span></h3>
+                    <p>Instant analysis using advanced JavaScript APIs. Perfect for quick assessments without any
+                        downloads or installations.</p>
+                    <ul>
+                        <li>✨ Zero installation required</li>
+                        <li>🔒 100% privacy-focused</li>
+                        <li>⚡ Results in under 10 seconds</li>
+                        <li>📊 Basic performance metrics</li>
+                    </ul>
+
+                    <a href="/api/scan"  class="btn btn-primary">Start Quick Scan</a>
+                </div>
+                <div class="scan-card fade-in" id="full-scan">
+                    <h3>Full Analysis <span class="highlight">• Agent Based</span></h3>
+                    <p>Comprehensive system analysis with our secure scanning agent. Get detailed hardware inventory and
+                        advanced performance metrics.</p>
+                    <ul>
+                        <li>🔬 Complete hardware analysis</li>
+                        <li>🎯 Precision performance metrics</li>
+                        <li>🛠️ Detailed upgrade recommendations</li>
+                        <li>📈 Historical performance tracking</li>
+                    </ul>
+                    <a href="/full-system-info" class="btn btn-secondary">Download Agent</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Rating System Demo -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">Advanced Rating System</h2>
+            <p class="section-subtitle">Multi-dimensional performance analysis with AI-powered insights</p>
+            <div class="rating-demo fade-in">
+                <div class="rating-circle">
+                    <div class="rating-score">A-</div>
+                </div>
+                <div class="rating-details">
+                    <h3>Your System Performance Score</h3>
+                    <p>Comprehensive analysis across key performance indicators:</p>
+
+                    <div class="rating-item">
+                        <span>CPU Performance</span>
+                        <div class="rating-bar">
+                            <div class="rating-fill" style="width: 88%;"></div>
+                        </div>
+                        <span>88%</span>
+                    </div>
+
+                    <div class="rating-item">
+                        <span>Memory Efficiency</span>
+                        <div class="rating-bar">
+                            <div class="rating-fill" style="width: 76%;"></div>
+                        </div>
+                        <span>76%</span>
+                    </div>
+
+                    <div class="rating-item">
+                        <span>Storage Speed</span>
+                        <div class="rating-bar">
+                            <div class="rating-fill" style="width: 68%;"></div>
+                        </div>
+                        <span>68%</span>
+                    </div>
+
+                    <div class="rating-item">
+                        <span>Graphics Power</span>
+                        <div class="rating-bar">
+                            <div class="rating-fill" style="width: 84%;"></div>
+                        </div>
+                        <span>84%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section bg-pattern" id="features">
+        <div class="container">
+            <h2 class="section-title">Why Choose SpecScoreX?</h2>
+            <p class="section-subtitle">Advanced features designed for modern system analysis</p>
+            <div class="features-grid">
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Lightning Fast</h3>
+                    <p>Get instant results with our optimized scanning algorithms and real-time analysis engine.</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Privacy First</h3>
+                    <p>Your data never leaves your device. All analysis is performed locally with optional cloud
+                        features.</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">🌐</div>
+                    <h3>Cross-Platform</h3>
+                    <p>Works seamlessly across Windows, macOS, and Linux systems with consistent results.</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI-Powered</h3>
+                    <p>Advanced machine learning algorithms provide accurate performance predictions and
+                        recommendations.</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">📊</div>
+                    <h3>Detailed Analytics</h3>
+                    <p>Comprehensive performance metrics with historical tracking and trend analysis.</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">🔄</div>
+                    <h3>Regular Updates</h3>
+                    <p>Continuously updated hardware database and performance benchmarks for accurate scoring.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Team Section -->
+    <section class="section" id="team">
+        <div class="container">
+            <h2 class="section-title">Meet Our Team</h2>
+            <p class="section-subtitle">The passionate developers behind SpecScoreX</p>
+            <div class="team-grid">
+                <div class="team-card fade-in">
+                    <div class="team-avatar">👨‍💻</div>
+                    <h3>Akarsh</h3>
+                    <p>Team Lead & Backend Developer</p>
+                </div>
+                <div class="team-card fade-in">
+                    <div class="team-avatar">🎨</div>
+                    <h3>Ajeet</h3>
+                    <p>Frontend Designer & UI/UX Expert</p>
+                </div>
+                <div class="team-card fade-in">
+                    <div class="team-avatar">⚡</div>
+                    <h3>Ayush</h3>
+                    <p>Full Stack Developer & System Architect</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack -->
+    <section style="background: var(--gradient-primary); color: white; padding: 3rem 0;">
+        <div class="container">
+            <div style="text-align: center;">
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Built with Modern Technology</h3>
+                <p style="font-size: 1.125rem; opacity: 0.9;">Python • Flask • JavaScript • PowerShell • React •
+                    TailwindCSS • Docker • AWS</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>SpecScoreX</h3>
+                    <p>The next-generation system rating engine designed for modern computing environments. Analyze,
+                        optimize, and enhance your PC performance with AI-powered insights.</p>
+                </div>
+                <div class="footer-section">
+                    <h3>Quick Links</h3>
+                    <a href="#">Documentation</a>
+                    <a href="#">API Reference</a>
+                    <a href="#">GitHub Repository</a>
+                    <a href="#">Release Notes</a>
+                </div>
+                <div class="footer-section">
+                    <h3>Support</h3>
+                    <a href="#">Help Center</a>
+                    <a href="#">Contact Us</a>
+                    <a href="#">Bug Reports</a>
+                    <a href="#">Feature Requests</a>
+                </div>
+                <div class="footer-section">
+                    <h3>Legal</h3>
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                    <a href="#">MIT License</a>
+                    <a href="#">Cookie Policy</a>
+                </div>
+            </div>
+            <div
+                style="text-align: center; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); opacity: 0.8;">
+                <p>&copy; 2024 SpecScoreX. All rights reserved. Made with ❤️ for the developer community.</p>
+            </div>
+        </div>
+    </footer>
+        <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+</body>
+
+</html>
