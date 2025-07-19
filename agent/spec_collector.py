@@ -11,7 +11,7 @@ import sys
 import tempfile
 
 # === CONFIGURATION ===
-API_ENDPOINT = "http://localhost:5000/api/full-system-info"
+API_ENDPOINT = "https://specscorex.onrender.com/api/full-system-info"
 SEND_TO_API = True  # Set to False for debug mode without sending
 
 # Robust PowerShell script without auto-elevation
@@ -358,7 +358,7 @@ if __name__ == "__main__":
     if SEND_TO_API:
         if send_to_backend(final_data):
             import webbrowser
-            webbrowser.open("http://localhost:5000/report")
+            webbrowser.open("https://specscorex.onrender.com/report")
     else:
         print("[*] Debug Mode Output:\n")
         print(json.dumps(final_data, indent=2))
