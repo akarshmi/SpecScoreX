@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitor - {{ system.hostname or 'Unknown' }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .card-icon {
+            font-size: 2.5rem;
+            color: #007bff;
+        }
+        .metric-card {
+            transition: transform 0.2s;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        .system-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+        }
+        .gpu-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        .memory-card {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        .cpu-card {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid py-4">
+        <!-- Header Section -->
+        <div class="system-header text-center">
+            <h1><i class="fas fa-desktop"></i> {{ system.hostname or 'Unknown Host' }}</h1>
+            <p class="lead">{{ system.os or 'Unknown OS' }} {{ system.architecture or '' }}</p>
+            <small>Last Updated: {{ system.timestamp or 'Unknown' }}</small>
+        </div>
+
+        <!-- Key Metrics Row -->
+        <div class="row mb-4">
+            <!-- CPU Card -->
+            <div class="col-md-4 mb-3">
+                <div class="card metric-card cpu-card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-microchip card-icon"></i>
+                        <h5 class="card-title mt-2">CPU</h5>
+                        <h3>{{ hardware.cpu.cores or 0 }} Cores / {{ hardware.cpu.threads or 0 }} Threads</h3>
+                        <p class="mb-1">{{ (hardware.cpu.name or 'Unknown CPU')[:30] }}...</p>
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar bg-light" 
+                                 style="width: {{ hardware.cpu.usage or 0 }}%"
+                                 aria-valuenow="{{ hardware.cpu.usage or 0 }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                        <small>{{ hardware.cpu.usage or 0 }}% Usage</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Memory Card -->
+            <div class="col-md-4 mb-3">
+                <div class="card metric-card memory-card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-memory card-icon"></i>
+                        <h5 class="card-title mt-2">Memory</h5>
+                        <h3>{{ hardware.memory.total_ram or 0 }} GB RAM</h3>
+                        <p class="mb-1">{{ hardware.memory.used_ram or 0 }} GB Used</p>
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar bg-light" 
+                                 style="width: {{ hardware.memory.usage_percent or 0 }}%"
+                                 aria-valuenow="{{ hardware.memory.usage_percent or 0 }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                        <small>{{ hardware.memory.usage_percent or 0 }}% Used</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Storage Card -->
+            <div class="col-md-4 mb-3">
+                <div class="card metric-card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-hdd card-icon"></i>
+                        <h5 class="card-title mt-2">Storage</h5>
+                        <div id="storage-summary">
+                            {% if storage.logical_disks %}
+                                {% set total_storage = storage.logical_disks | sum(attribute='total_size') %}
+                                {% set used_storage = storage.logical_disks | sum(attribute='used') %}
+                                {% set usage_percent = (used_storage / total_storage * 100) | round(1) %}
+                                <h3>{{ total_storage | round(1) }} GB Total</h3>
+                                <p class="mb-1">{{ used_storage | round(1) }} GB Used</p>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div class="progress-bar bg-primary" 
+                                         style="width: {{ usage_percent }}%">
+                                    </div>
+                                </div>
+                                <small>{{ usage_percent }}% Used</small>
+                            {% else %}
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Graphics Cards Row -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-display"></i> Graphics Cards</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% if hardware.graphics %}
+                                {% for gpu in hardware.graphics %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="card gpu-card">
+                                        <div class="card-body">
+                                            <h6>{{ gpu.Name or 'Unknown GPU' }}</h6>
+                                            <p class="mb-1">VRAM: {{ gpu.AdapterRAMGB or 0 }} GB</p>
+                                            <small>Driver: {{ gpu.DriverVersion or 'Unknown' }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="col-12">
+                                    <div class="alert alert-info">No graphics cards information available</div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disk Usage Details -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-hard-drive"></i> Disk Usage</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="loadStorageDetails()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="disk-details">
+                            {% if storage.logical_disks %}
+                                <div class="row">
+                                    {% for disk in storage.logical_disks %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <h6 class="mb-0">{{ disk.device }} ({{ disk.filesystem }})</h6>
+                                                    <span class="badge bg-secondary">{{ disk.usage_percent }}%</span>
+                                                </div>
+                                                <div class="progress mb-2" style="height: 10px;">
+                                                    <div class="progress-bar 
+                                                        {% if disk.usage_percent > 80 %}bg-danger
+                                                        {% elif disk.usage_percent > 60 %}bg-warning
+                                                        {% else %}bg-success{% endif %}" 
+                                                         style="width: {{ disk.usage_percent }}%">
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">
+                                                    {{ disk.used | round(1) }} GB used of {{ disk.total_size | round(1) }} GB
+                                                    ({{ disk.free | round(1) }} GB free)
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading disk information...</span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Information -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-network-wired"></i> Network Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="network-info">
+                            {% if network.primary_ip %}
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Primary Network</h6>
+                                        <p><strong>IP Address:</strong> {{ network.primary_ip }}</p>
+                                        <p><strong>MAC Address:</strong> {{ network.primary_mac }}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Adapter Information</h6>
+                                        <p><strong>Description:</strong> {{ network.adapter_info.description }}</p>
+                                        <p><strong>Gateway:</strong> {{ network.adapter_info.gateway | join(', ') }}</p>
+                                        <p><strong>DNS:</strong> {{ network.adapter_info.dns_servers | join(', ') }}</p>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading network information...</span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-tools"></i> Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-outline-primary" onclick="refreshSystemInfo()">
+                                <i class="fas fa-sync-alt"></i> Refresh All
+                            </button>
+                            <button class="btn btn-outline-info" onclick="exportData()">
+                                <i class="fas fa-download"></i> Export Data
+                            </button>
+                            <button class="btn btn-outline-success" onclick="viewRawData()">
+                                <i class="fas fa-code"></i> View Raw JSON
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Load storage details
+        function loadStorageDetails() {
+            fetch('/api/storage')
+                .then(response => response.json())
+                .then(data => {
+                    let html = '<div class="row">';
+                    
+                    // Storage summary
+                    let totalStorage = 0;
+                    let usedStorage = 0;
+                    
+                    data.logical_disks.forEach(disk => {
+                        totalStorage += disk.total_size;
+                        usedStorage += disk.used;
+                        
+                        html += `
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="mb-0">${disk.device} (${disk.filesystem})</h6>
+                                            <span class="badge bg-secondary">${disk.usage_percent}%</span>
+                                        </div>
+                                        <div class="progress mb-2" style="height: 10px;">
+                                            <div class="progress-bar ${disk.usage_percent > 80 ? 'bg-danger' : disk.usage_percent > 60 ? 'bg-warning' : 'bg-success'}" 
+                                                 style="width: ${disk.usage_percent}%">
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">
+                                            ${disk.used.toFixed(1)} GB used of ${disk.total_size.toFixed(1)} GB
+                                            (${disk.free.toFixed(1)} GB free)
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    
+                    // Update storage summary
+                    const storageSummary = document.getElementById('storage-summary');
+                    if (storageSummary) {
+                        const totalUsagePercent = (usedStorage / totalStorage * 100).toFixed(1);
+                        storageSummary.innerHTML = `
+                            <h3>${totalStorage.toFixed(1)} GB Total</h3>
+                            <p class="mb-1">${usedStorage.toFixed(1)} GB Used</p>
+                            <div class="progress mb-2" style="height: 8px;">
+                                <div class="progress-bar bg-primary" 
+                                     style="width: ${totalUsagePercent}%">
+                                </div>
+                            </div>
+                            <small>${totalUsagePercent}% Used</small>
+                        `;
+                    }
+                    
+                    document.getElementById('disk-details').innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error loading storage details:', error);
+                    document.getElementById('disk-details').innerHTML = 
+                        '<div class="alert alert-danger">Error loading storage information</div>';
+                });
+        }
+
+        // Load network information
+        function loadNetworkInfo() {
+            fetch('/api/network')
+                .then(response => response.json())
+                .then(data => {
+                    const html = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Primary Network</h6>
+                                <p><strong>IP Address:</strong> ${data.primary_ip}</p>
+                                <p><strong>MAC Address:</strong> ${data.primary_mac}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Adapter Information</h6>
+                                <p><strong>Description:</strong> ${data.adapter_info.description}</p>
+                                <p><strong>Gateway:</strong> ${data.adapter_info.gateway.join(', ')}</p>
+                                <p><strong>DNS:</strong> ${data.adapter_info.dns_servers.join(', ')}</p>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('network-info').innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error loading network info:', error);
+                    document.getElementById('network-info').innerHTML = 
+                        '<div class="alert alert-danger">Error loading network information</div>';
+                });
+        }
+
+        // Refresh all system information
+        function refreshSystemInfo() {
+            location.reload();
+        }
+
+        // Export data functionality
+        function exportData() {
+            Promise.all([
+                fetch('/api/system').then(r => r.json()),
+                fetch('/api/hardware').then(r => r.json()),
+                fetch('/api/storage').then(r => r.json()),
+                fetch('/api/network').then(r => r.json())
+            ]).then(([system, hardware, storage, network]) => {
+                const data = { system, hardware, storage, network };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `system-report-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // View raw data
+        function viewRawData() {
+            window.open('/api/system', '_blank');
+        }
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Only load if the initial data is not present
+            if (!document.getElementById('disk-details').innerHTML.includes('col-md-6')) {
+                loadStorageDetails();
+            }
+            if (!document.getElementById('network-info').innerHTML.includes('Primary Network')) {
+                loadNetworkInfo();
+            }
+        });
+    </script>
+</body>
+</html>

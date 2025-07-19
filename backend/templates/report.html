@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced System Performance Evaluator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1);
+            border-radius: 2px;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            animation: fadeInUp 1s ease-out;
+        }
+
+        .header p {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            animation: fadeInUp 1s ease-out 0.2s both;
+        }
+
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            margin-right: 20px;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            color: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .cpu-icon { background: linear-gradient(135deg, #4CAF50, #45a049); }
+        .gpu-icon { background: linear-gradient(135deg, #FF9800, #f57c00); }
+        .ram-icon { background: linear-gradient(135deg, #2196F3, #1976d2); }
+        .disk-icon { background: linear-gradient(135deg, #9C27B0, #7b1fa2); }
+        .system-icon { background: linear-gradient(135deg, #607D8B, #455a64); }
+        .network-icon { background: linear-gradient(135deg, #795548, #5d4037); }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .spec-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.3s ease;
+        }
+
+        .spec-item:hover {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        .spec-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .spec-value {
+            font-weight: 700;
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        .progress-container {
+            margin-top: 20px;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: #f0f0f0;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 1s ease;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .progress-good { background: linear-gradient(135deg, #4CAF50, #45a049); }
+        .progress-warning { background: linear-gradient(135deg, #FF9800, #f57c00); }
+        .progress-danger { background: linear-gradient(135deg, #F44336, #d32f2f); }
+
+        .benchmark-section {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+
+        .benchmark-title {
+            text-align: center;
+            font-size: 2.2rem;
+            margin-bottom: 30px;
+            color: #333;
+            font-weight: 700;
+        }
+
+        .performance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .performance-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            border: 3px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .performance-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .performance-card:hover::before {
+            opacity: 1;
+        }
+
+        .performance-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+        }
+
+        .performance-score {
+            font-size: 4rem;
+            font-weight: 900;
+            margin-bottom: 15px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .score-good { 
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .score-warning { 
+            background: linear-gradient(135deg, #FF9800, #f57c00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .score-danger { 
+            background: linear-gradient(135deg, #F44336, #d32f2f);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .performance-category {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .performance-description {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .performance-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            text-align: left;
+        }
+
+        .detail-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .detail-icon {
+            margin-right: 8px;
+            font-size: 1.2rem;
+        }
+
+        .recommendation-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .recommendation-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+        }
+
+        .recommendation-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .recommendation-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 20px;
+            font-size: 28px;
+            color: white;
+            box-shadow: 0 10px 25px rgba(102,126,234,0.3);
+        }
+
+        .recommendation-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .recommendation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .recommendation-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 25px;
+            border-radius: 15px;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            border-left: 5px solid transparent;
+        }
+
+        .recommendation-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .recommendation-item.high-priority {
+            border-left-color: #F44336;
+            background: linear-gradient(135deg, rgba(244,67,54,0.1), rgba(244,67,54,0.05));
+        }
+
+        .recommendation-item.medium-priority {
+            border-left-color: #FF9800;
+            background: linear-gradient(135deg, rgba(255,152,0,0.1), rgba(255,152,0,0.05));
+        }
+
+        .recommendation-item.low-priority {
+            border-left-color: #4CAF50;
+            background: linear-gradient(135deg, rgba(76,175,80,0.1), rgba(76,175,80,0.05));
+        }
+
+        .recommendation-priority {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            margin-right: 20px;
+            flex-shrink: 0;
+            margin-top: 5px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .priority-high { background: linear-gradient(135deg, #F44336, #d32f2f); }
+        .priority-medium { background: linear-gradient(135deg, #FF9800, #f57c00); }
+        .priority-low { background: linear-gradient(135deg, #4CAF50, #45a049); }
+
+        .recommendation-content {
+            flex: 1;
+        }
+
+        .recommendation-content h4 {
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .recommendation-content p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .advanced-tips {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+
+        .tips-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+            position: relative;
+        }
+
+        .tips-header:hover {
+            background: linear-gradient(135deg, #5a67d8, #6a4c93);
+        }
+
+        .tips-header h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .tips-content {
+            padding: 40px;
+            display: none;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .tips-content.active {
+            display: block;
+        }
+
+        .tips-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .tip-item {
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border-left: 5px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .tip-item:hover {
+            background: #e9ecef;
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .tip-title {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 1.2rem;
+        }
+
+        .tip-description {
+            color: #666;
+            line-height: 1.7;
+        }
+
+        .comparison-section {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+
+        .comparison-title {
+            text-align: center;
+            font-size: 2.2rem;
+            margin-bottom: 30px;
+            color: #333;
+            font-weight: 700;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+        }
+
+        .comparison-item {
+            text-align: center;
+            padding: 25px;
+            border-radius: 15px;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+
+        .comparison-item:hover {
+            background: #e9ecef;
+            transform: translateY(-5px);
+        }
+
+        .comparison-category {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .vs-indicator {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .system-health {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+
+        .health-title {
+            text-align: center;
+            font-size: 2.2rem;
+            margin-bottom: 30px;
+            color: #333;
+            font-weight: 700;
+        }
+
+        .health-score {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .health-score-number {
+            font-size: 5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .health-indicators {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .health-indicator {
+            text-align: center;
+            padding: 20px;
+            border-radius: 15px;
+            background: #f8f9fa;
+        }
+
+        .indicator-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .indicator-status {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .indicator-desc {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .card, .performance-card, .recommendation-card, .advanced-tips, .benchmark-section, .comparison-section, .system-health {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            .header h1 {
+                font-size: 2.5rem;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .performance-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .recommendation-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tips-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .health-indicators {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+
+            .card, .recommendation-card, .benchmark-section, .comparison-section, .system-health {
+                padding: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Advanced System Performance Evaluator</h1>
+            <p>Comprehensive analysis and optimization recommendations for your system</p>
+        </div>
+
+        <!-- Quick Stats Overview -->
+        <div class="stats-overview">
+            <div class="stat-card">
+                <div class="stat-number">75%</div>
+                <div class="stat-label">Overall Health</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">5.7/10</div>
+                <div class="stat-label">Performance Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">2</div>
+                <div class="stat-label">Critical Issues</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">465GB</div>
+                <div class="stat-label">Total Storage</div>
+            </div>
+        </div>
+
+        <!-- System Health Overview -->
+        <div class="system-health">
+            <div class="health-title">System Health Overview</div>
+            <div class="health-score">
+                <div class="health-score-number">75</div>
+                <div>Overall Health Score</div>
+            </div>
+            <div class="health-indicators">
+                <div class="health-indicator">
+                    <div class="indicator-icon">💾</div>
+                    <div class="indicator-status">RAM: Excellent</div>
+                    <div class="indicator-desc">16GB available</div>
+                </div>
+                <div class="health-indicator">
+                    <div class="indicator-icon">🔧</div>
+                    <div class="indicator-status">CPU: Good</div>
+                    <div class="indicator-desc">Aging but functional</div>
+                </div>
+                <div class="health-indicator">
+                    <div class="indicator-icon">🎮</div>
+                    <div class="indicator-status">GPU: Critical</div>
+                    <div class="indicator-desc">Needs immediate upgrade</div>
+                </div>
+                <div class="health-indicator">
+                    <div class="indicator-icon">💽</div>
+                    <div class="indicator-status">Storage: Warning</div>
+                    <div class="indicator-desc">Needs SSD upgrade</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Component Analysis -->
+        <div class="grid">
+            <!-- Enhanced CPU Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon cpu-icon">🔧</div>
+                    <div class="card-title">Processor (CPU)</div>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Model:</span>
+                    <span class="spec-value">Intel i5-6500T</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Base Clock:</span>
+                    <span class="spec-value">2.50 GHz</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Max Boost:</span>
+                    <span class="spec-value">3.10 GHz</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Cores/Threads:</span>
+                    <span class="spec-value">4C/4T</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Generation:</span>
+                    <span class="spec-value">6th Gen (Skylake)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">TDP:</span>
+                    <span class="spec-value">35W (Low Power)</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-label">
+                        <span>Performance Rating</span>
+                        <span>6.5/10</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-warning" style="width: 65%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enhanced GPU Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon gpu-icon">🎮</div>
+                    <div class="card-title">Graphics (GPU)</div>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Model:</span>
+                    <span class="spec-value">NVIDIA GT 610</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">VRAM:</span>
+                    <span class="spec-value">2 GB DDR3</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Architecture:</span>
+                    <span class="spec-value">Fermi (40nm)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Release Year:</span>
+                    <span class="spec-value">2012 (Legacy)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">DirectX Support:</span>
+                    <span class="spec-value">DirectX 11</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Gaming Capable:</span>
+                    <span class="spec-value">❌ No</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-label">
+                        <span>Performance Rating</span>
+                        <span>2.5/10</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-danger" style="width: 25%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enhanced RAM Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon ram-icon">💾</div>
+                    <div class="card-title">Memory (RAM)</div>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Total Capacity:</span>
+                    <span class="spec-value">15.95 GB</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Available:</span>
+                    <span class="spec-value">11.03 GB</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">In Use:</span>
+                    <span class="spec-value">4.92 GB (31%)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Likely Type:</span>
+                    <span class="spec-value">DDR4-2133</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Configuration:</span>
+                    <span class="spec-value">Dual Channel</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-label">
+                        <span>Memory Usage</span>
+                        <span>31% Used</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-good" style="width: 31%"></div>
+                    </div>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-label">
+                        <span>Capacity Rating</span>
+                        <span>8/10</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-good" style="width: 80%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enhanced Storage Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon disk-icon">💽</div>
+                    <div class="card-title">Storage Analysis</div>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">C: System Drive:</span>
+                    <span class="spec-value">100GB (59% Used)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">D: Data Drive:</span>
+                    <span class="spec-value">125GB (11% Used)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">E: Storage:</span>
+                    <span class="spec-value">125GB (12% Used)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">F: Backup:</span>
+                    <span class="spec-value">115GB (5% Used)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Total Capacity:</span>
+                    <span class="spec-value">465GB</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Drive Type:</span>
+                    <span class="spec-value">🔴 Traditional HDD</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-label">
+                        <span>C: Drive Usage</span>
+                        <span>59% Full</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-warning" style="width: 59%"></div>
+                    </div>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-label">
+                        <span>Performance Rating</span>
+                        <span>4/10</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-warning" style="width: 40%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enhanced System Info Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon system-icon">⚙️</div>
+                    <div class="card-title">System Information</div>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Operating System:</span>
+                    <span class="spec-value">Windows 10 Pro</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Build Number:</span>
+                    <span class="spec-value">19045</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Update Status:</span>
+                    <span class="spec-value">🟡 Older Build</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Architecture:</span>
+                    <span class="spec-value">x64 (64-bit)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">BIOS Version:</span>
+                    <span class="spec-value">5.12</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Motherboard:</span>
+                    <span class="spec-value">OEM Board</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Win 11 Compatible:</span>
+                    <span class="spec-value">❌ Likely No (TPM/CPU)</span>
+                </div>
+            </div>
+
+            <!-- Enhanced Network Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon network-icon">📶</div>
+                    <div class="card-title">Network & Connectivity</div>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Primary Adapter:</span>
+                    <span class="spec-value">Realtek 802.11n USB</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Connection Type:</span>
+                    <span class="spec-value">Wireless USB Dongle</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">WiFi Standard:</span>
+                    <span class="spec-value">802.11n (WiFi 4)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Max Speed:</span>
+                    <span class="spec-value">~150 Mbps</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">MAC Address:</span>
+                    <span class="spec-value">00:2E:2D:70:1C:2E</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Reliability:</span>
+                    <span class="spec-value">🟡 Basic Performance</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enhanced Performance Benchmarks -->
+        <div class="benchmark-section">
+            <div class="benchmark-title">Performance Benchmarks</div>
+            <div class="performance-grid">
+                <div class="performance-card">
+                    <div class="performance-score score-danger">3/10</div>
+                    <div class="performance-category">Gaming Performance</div>
+                    <div class="performance-description">🔴 Not suitable for modern gaming</div>
+                    <div class="performance-details">
+                        <div class="detail-item">
+                            <span class="detail-icon">🎮</span>
+                            <span>Esports: Low settings only</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">🎯</span>
+                            <span>AAA Games: Not playable</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">📱</span>
+                            <span>Indie Games: Possible</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">🕹️</span>
+                            <span>Retro Gaming: Excellent</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="performance-card">
+                    <div class="performance-score score-warning">6/10</div>
+                    <div class="performance-category">Productivity</div>
+                    <div class="performance-description">🟡 Good for office work and basic tasks</div>
+                    <div class="performance-details">
+                        <div class="detail-item">
+                            <span class="detail-icon">📝</span>
+                            <span>Office Apps: Excellent</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">🌐</span>
+                            <span>Web Browsing: Good</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">📊</span>
+                            <span>Light Multitasking: OK</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">🎨</span>
+                            <span>Photo Editing: Basic</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="performance-card">
+                    <div class="performance-score score-good">8/10</div>
+                    <div class="performance-category">Daily Computing</div>
+                    <div class="performance-description">🟢 Excellent for everyday tasks</div>
+                    <div class="performance-details">
+                        <div class="detail-item">
+                            <span class="detail-icon">📺</span>
+                            <span>Video Streaming: Perfect</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">📧</span>
+                            <span>Email & Chat: Excellent</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">🎵</span>
+                            <span>Music & Media: Great</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">💼</span>
+                            <span>Basic Tasks: Perfect</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System vs Modern Standards Comparison -->
+        <div class="comparison-section">
+            <div class="comparison-title">System vs Modern Standards</div>
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <div class="comparison-category">CPU Performance</div>
+                    <div class="vs-indicator">Your System vs Modern Entry-Level</div>
+                    <div class="performance-score score-warning">65%</div>
+                    <div>Still capable but showing age</div>
+                </div>
+                <div class="comparison-item">
+                    <div class="comparison-category">GPU Performance</div>
+                    <div class="vs-indicator">Your System vs Modern Entry-Level</div>
+                    <div class="performance-score score-danger">15%</div>
+                    <div>Severely outdated</div>
+                </div>
+                <div class="comparison-item">
+                    <div class="comparison-category">RAM Capacity</div>
+                    <div class="vs-indicator">Your System vs Modern Standard</div>
+                    <div class="performance-score score-good">100%</div>
+                    <div>Meets current standards</div>
+                </div>
+                <div class="comparison-item">
+                    <div class="comparison-category">Storage Speed</div>
+                    <div class="vs-indicator">Your System vs Modern SSD</div>
+                    <div class="performance-score score-danger">25%</div>
+                    <div>Needs SSD upgrade</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enhanced Recommendations -->
+        <div class="recommendation-card">
+            <div class="recommendation-header">
+                <div class="recommendation-icon">🎯</div>
+                <div class="recommendation-title">Upgrade Roadmap</div>
+            </div>
+            
+            <div class="recommendation-grid">
+                <div class="recommendation-item high-priority">
+                    <div class="recommendation-priority priority-high"></div>
+                    <div class="recommendation-content">
+                        <h4>🔴 Priority #1: SSD Upgrade</h4>
+                        <p><strong>Impact:</strong> Massive performance boost<br>
+                        <strong>Cost:</strong> $50-150<br>
+                        <strong>Recommendation:</strong> 500GB SATA SSD for main drive. This will dramatically improve boot times, application loading, and overall system responsiveness.</p>
+                    </div>
+                </div>
+                
+                <div class="recommendation-item high-priority">
+                    <div class="recommendation-priority priority-high"></div>
+                    <div class="recommendation-content">
+                        <h4>🔴 Priority #2: GPU Upgrade</h4>
+                        <p><strong>Impact:</strong> Enables modern gaming<br>
+                        <strong>Cost:</strong> $150-400<br>
+                        <strong>Recommendation:</strong> GTX 1650 or RTX 3060 if budget allows. Check PSU compatibility first.</p>
+                    </div>
+                </div>
+                
+                <div class="recommendation-item medium-priority">
+                    <div class="recommendation-priority priority-medium"></div>
+                    <div class="recommendation-content">
+                        <h4>🟡 Priority #3: Platform Upgrade</h4>
+                        <p><strong>Impact:</strong> Future-proofing<br>
+                        <strong>Cost:</strong> $300-600<br>
+                        <strong>Recommendation:</strong> Consider new CPU + Motherboard combo (AMD Ryzen 5 or Intel i5 12th gen) for long-term performance.</p>
+                    </div>
+                </div>
+                
+                <div class="recommendation-item medium-priority">
+                    <div class="recommendation-priority priority-medium"></div>
+                    <div class="recommendation-content">
+                        <h4>🟡 Priority #4: Network Upgrade</h4>
+                        <p><strong>Impact:</strong> Better connectivity<br>
+                        <strong>Cost:</strong> $30-80<br>
+                        <strong>Recommendation:</strong> WiFi 6 USB adapter or PCIe card for faster, more reliable internet.</p>
+                    </div>
+                </div>
+                
+                <div class="recommendation-item low-priority">
+                    <div class="recommendation-priority priority-low"></div>
+                    <div class="recommendation-content">
+                        <h4>🟢 Good: RAM Status</h4>
+                        <p><strong>Impact:</strong> No immediate need<br>
+                        <strong>Status:</strong> Sufficient for current needs<br>
+                        <strong>Note:</strong> 16GB is adequate for most users. Consider upgrading only if doing heavy multitasking or content creation.</p>
+                    </div>
+                </div>
+                
+                <div class="recommendation-item low-priority">
+                    <div class="recommendation-priority priority-low"></div>
+                    <div class="recommendation-content">
+                        <h4>🟢 Optional: Windows 11</h4>
+                        <p><strong>Impact:</strong> Security & features<br>
+                        <strong>Status:</strong> Windows 10 still supported<br>
+                        <strong>Note:</strong> May not be compatible due to TPM requirements. Consider after hardware upgrades.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enhanced Advanced Tips -->
+        <div class="advanced-tips">
+            <div class="tips-header" onclick="toggleTips()">
+                <h3>⚡ Advanced Optimization & Maintenance Tips (Click to expand)</h3>
+            </div>
+            <div class="tips-content" id="tipsContent">
+                <div class="tips-grid">
+                    <div class="tip-item">
+                        <div class="tip-title">🧹 Deep System Cleanup</div>
+                        <div class="tip-description">
+                            Use built-in Disk Cleanup, clear temporary files, remove bloatware, and run storage sense. Consider CCleaner for registry cleanup and deeper cleaning.
+                        </div>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <div class="tip-title">🔧 Driver Optimization</div>
+                        <div class="tip-description">
+                            Update all drivers, especially graphics. Use Device Manager or manufacturer tools. Consider DDU (Display Driver Uninstaller) for clean GPU driver installation.
+                        </div>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <div class="tip-title">🌡️ Thermal Management</div>
+                        <div class="tip-description">
+                            Monitor temperatures with HWiNFO64. Clean dust from fans and heatsinks. Consider thermal paste replacement if CPU temps exceed 70°C under load.
+                        </div>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <div class="tip-title">⚙️ Power & Performance Settings</div>
+                        <div class="tip-description">
+                            Set Windows to "High Performance" mode. Disable fast startup if using HDD. Enable GPU scheduling in Windows 10 graphics settings.
+                        </div>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <div class="tip-title">🚀 Startup Optimization</div>
+                        <div class="tip-description">
+                            Disable unnecessary startup programs via Task Manager. Use msconfig to optimize boot. Consider using autoruns for advanced startup management.
+                        </div>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <div class="tip-title">💾 Memory Management</div>
+                        <div class="tip-description">
+                            Enable XMP in BIOS for RAM speed. Check for memory leaks with Task Manager. Consider virtual memory optimization for better performance.
+                        </div>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <div class="tip-title">🔒 Security Hardening</div>
+                        <div class="tip-description">
+                            Keep Windows Defender updated. Enable Windows Firewall. Consider upgrading to Windows 11 for enhanced security features when hardware allows.
+                        </div>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <div class="tip-title">📊 Performance Monitoring</div>
+                        <div class="tip-description">
+                            Use Task Manager, Resource Monitor, and Performance Monitor. Install MSI Afterburner for GPU monitoring and HWiNFO64 for comprehensive system monitoring.
+                        </div>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <div class="tip-title">🎮 Gaming Optimization</div>
+                        <div class="tip-description">
+                            Enable Windows Game Mode. Disable fullscreen optimizations. Set games to High Priority in Task Manager. Consider game-specific optimizations.
+                        </div>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <div class="tip-title">🛠️ Maintenance Schedule</div>
+                        <div class="tip-description">
+                            Weekly: Check for Windows updates, run antivirus scan. Monthly: Clean dust, check disk health. Quarterly: Full system cleanup and defragmentation.
+                        </div>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <div class="tip-title">💡 Budget Upgrade Tips</div>
+                        <div class="tip-description">
+                            Start with SSD upgrade for maximum impact. Shop used GPUs carefully. Consider gradual upgrades over time. Check compatibility before purchasing.
+                        </div>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <div class="tip-title">🔄 System Backup</div>
+                        <div class="tip-description">
+                            Create system restore points before major changes. Use Windows Backup or third-party solutions. Keep important files synced to cloud storage.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleTips() {
+            const content = document.getElementById('tipsContent');
+            const header = document.querySelector('.tips-header');
+            
+            content.classList.toggle('active');
+            
+            if (content.classList.contains('active')) {
+                header.style.background = 'linear-gradient(135deg, #5a67d8, #6a4c93)';
+            } else {
+                header.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+            }
+        }
+
+        // Enhanced animations and interactions
+        document.addEventListener('DOMContentLoaded', function() {
+            // Animate progress bars with delay
+            const progressBars = document.querySelectorAll('.progress-fill');
+            progressBars.forEach((bar, index) => {
+                const width = bar.style.width;
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.width = width;
+                }, 300 + (index * 100));
+            });
+
+            // Animate performance scores with counting effect
+            const scores = document.querySelectorAll('.performance-score');
+            scores.forEach((score, index) => {
+                const targetText = score.textContent;
+                const targetNumber = parseInt(targetText.split('/')[0]);
+                score.textContent = '0/10';
+                
+                setTimeout(() => {
+                    let current = 0;
+                    const interval = setInterval(() => {
+                        current++;
+                        score.textContent = current + '/10';
+                        if (current >= targetNumber) {
+                            clearInterval(interval);
+                        }
+                    }, 50);
+                }, 1000 + (index * 200));
+            });
+
+            // Animate health score
+            const healthScore = document.querySelector('.health-score-number');
+            if (healthScore) {
+                const targetNumber = parseInt(healthScore.textContent);
+                healthScore.textContent = '0';
+                
+                setTimeout(() => {
+                    let current = 0;
+                    const interval = setInterval(() => {
+                        current += 2;
+                        healthScore.textContent = current;
+                        if (current >= targetNumber) {
+                            healthScore.textContent = targetNumber;
+                            clearInterval(interval);
+                        }
+                    }, 30);
+                }, 500);
+            }
+
+            // Animate stat cards
+            const statNumbers = document.querySelectorAll('.stat-number');
+            statNumbers.forEach((stat, index) => {
+                const originalText = stat.textContent;
+                const isPercentage = originalText.includes('%');
+                const isScore = originalText.includes('/');
+                const isNumber = !isNaN(parseInt(originalText));
+                
+                if (isPercentage) {
+                    const targetNumber = parseInt(originalText);
+                    stat.textContent = '0%';
+                    setTimeout(() => {
+                        let current = 0;
+                        const interval = setInterval(() => {
+                            current += 2;
+                            stat.textContent = current + '%';
+                            if (current >= targetNumber) {
+                                stat.textContent = originalText;
+                                clearInterval(interval);
+                            }
+                        }, 30);
+                    }, 200 + (index * 100));
+                } else if (isScore) {
+                    const targetNumber = parseFloat(originalText);
+                    stat.textContent = '0/10';
+                    setTimeout(() => {
+                        let current = 0;
+                        const interval = setInterval(() => {
+                            current += 0.1;
+                            stat.textContent = current.toFixed(1) + '/10';
+                            if (current >= targetNumber) {
+                                stat.textContent = originalText;
+                                clearInterval(interval);
+                            }
+                        }, 50);
+                    }, 200 + (index * 100));
+                } else if (isNumber && !originalText.includes('GB')) {
+                    const targetNumber = parseInt(originalText);
+                    stat.textContent = '0';
+                    setTimeout(() => {
+                        let current = 0;
+                        const interval = setInterval(() => {
+                            current++;
+                            stat.textContent = current;
+                            if (current >= targetNumber) {
+                                stat.textContent = originalText;
+                                clearInterval(interval);
+                            }
+                        }, 100);
+                    }, 200 + (index * 100));
+                }
+            });
+
+            // Add hover effects to cards
+            const cards = document.querySelectorAll('.card, .performance-card, .stat-card');
+            cards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-8px) scale(1.02)';
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                });
+            });
+
+            // Add click effects to recommendation items
+            const recommendationItems = document.querySelectorAll('.recommendation-item');
+            recommendationItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    this.style.transform = 'scale(0.98)';
+                    setTimeout(() => {
+                        this.style.transform = 'scale(1)';
+                    }, 150);
+                });
+            });
+
+            // Intersection Observer for animations
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }
+                });
+            }, observerOptions);
+
+            // Observe all main sections
+            const sections = document.querySelectorAll('.card, .performance-card, .recommendation-card, .benchmark-section, .comparison-section, .system-health');
+            sections.forEach(section => {
+                section.style.opacity = '0';
+                section.style.transform = 'translateY(30px)';
+                section.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                observer.observe(section);
+            });
+        });
+    </script>
+</body>
+</html>

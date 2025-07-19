@@ -356,7 +356,9 @@ if __name__ == "__main__":
     final_data = merge_data(python_info, powershell_info)
 
     if SEND_TO_API:
-        send_to_backend(final_data)
+        if send_to_backend(final_data):
+            import webbrowser
+            webbrowser.open("http://localhost:5000/report")
     else:
         print("[*] Debug Mode Output:\n")
         print(json.dumps(final_data, indent=2))

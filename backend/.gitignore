@@ -1,0 +1,53 @@
+# ─── Python Bytecode ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ─── C Extensions ────────────────────────────────────────────────
+*.so
+
+# ─── Virtual Environments ────────────────────────────────────────
+venv/
+.venv/
+ENV/
+env/
+.ENV/
+
+# ─── Flask & Python Runtime Files ────────────────────────────────
+instance/
+*.db
+*.pid
+
+# ─── Logs ────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Environment Variables ───────────────────────────────────────
+.env
+*.env
+
+# ─── Editor / IDE Settings ───────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── Test & Coverage Reports ─────────────────────────────────────
+htmlcov/
+.tox/
+.nox/
+.coverage
+coverage.xml
+.cache
+.pytest_cache/
+
+# ─── Build Outputs ───────────────────────────────────────────────
+build/
+dist/
+*.egg-info/
+
+# ─── OS-Specific Files ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
