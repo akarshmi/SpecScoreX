@@ -3,183 +3,266 @@ import socket
 import psutil
 import json
 import uuid
+import hashlib
 from datetime import datetime
 import requests
 import subprocess
 import os
 import sys
 import tempfile
+import logging
+from typing import Dict, Any, Optional
 
 # === CONFIGURATION ===
 API_ENDPOINT = "https://specscorex.onrender.com/api/full-system-info"
-SEND_TO_API = True  # Set to False for debug mode without sending
+SEND_TO_API = True  # Set to False for debug mode
+ANONYMIZE_DATA = True  # Set to True to hash sensitive identifiers
+LOG_LEVEL = logging.INFO
 
-# Robust PowerShell script without auto-elevation
+# Setup logging
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Enhanced PowerShell script with better error handling
 POWERSHELL_SCRIPT = '''
-# Suppress progress bars and verbose output
 $ProgressPreference = "SilentlyContinue"
-$VerbosePreference = "SilentlyContinue"
+$VerbosePreference = "SilentlyContinue" 
 $WarningPreference = "SilentlyContinue"
 
+function Get-SafeValue {
+    param($Value, $Default = "Unknown")
+    return if ($null -eq $Value -or $Value -eq "") { $Default } else { $Value }
+}
+
+function Convert-BytesToGB {
+    param([long]$Bytes)
+    return if ($Bytes -gt 0) { [math]::Round($Bytes / 1GB, 2) } else { 0 }
+}
+
 try {
-    $timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
+    $timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
     
-    # Operating System - with error handling
+    # OS Information with error handling
     try {
-        $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop | Select-Object Caption, Version, OSArchitecture, LastBootUpTime, BuildNumber, InstallDate
+        $osInfo = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+        $os = @{
+            name = Get-SafeValue $osInfo.Caption
+            version = Get-SafeValue $osInfo.Version
+            build_number = Get-SafeValue $osInfo.BuildNumber
+            architecture = Get-SafeValue $osInfo.OSArchitecture
+            install_date = if ($osInfo.InstallDate) { $osInfo.InstallDate.ToString("yyyy-MM-dd") } else { "Unknown" }
+            last_boot = if ($osInfo.LastBootUpTime) { $osInfo.LastBootUpTime.ToString("yyyy-MM-dd HH:mm:ss") } else { "Unknown" }
+            timezone = Get-SafeValue (Get-TimeZone).Id
+        }
     } catch {
         $os = @{error = "Failed to get OS info: $($_.Exception.Message)"}
     }
     
     # Computer System
     try {
-        $computer = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop | Select-Object Manufacturer, Model, Name, TotalPhysicalMemory, SystemType
+        $computerInfo = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+        $computer = @{
+            manufacturer = Get-SafeValue $computerInfo.Manufacturer
+            model = Get-SafeValue $computerInfo.Model
+            system_type = Get-SafeValue $computerInfo.SystemType
+            total_physical_memory_gb = Convert-BytesToGB $computerInfo.TotalPhysicalMemory
+            domain_role = switch ($computerInfo.DomainRole) {
+                0 { "Standalone Workstation" }
+                1 { "Member Workstation" }
+                2 { "Standalone Server" }
+                3 { "Member Server" }
+                4 { "Backup Domain Controller" }
+                5 { "Primary Domain Controller" }
+                default { "Unknown" }
+            }
+        }
     } catch {
         $computer = @{error = "Failed to get computer info: $($_.Exception.Message)"}
     }
     
-    # Processor Info
+    # Processor Information
     try {
-        $processors = Get-CimInstance Win32_Processor -ErrorAction Stop | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed
+        $processorInfo = Get-CimInstance Win32_Processor -ErrorAction Stop
+        $processors = @()
+        foreach ($proc in $processorInfo) {
+            $processors += @{
+                name = Get-SafeValue $proc.Name
+                manufacturer = Get-SafeValue $proc.Manufacturer
+                cores = Get-SafeValue $proc.NumberOfCores 0
+                logical_processors = Get-SafeValue $proc.NumberOfLogicalProcessors 0
+                max_clock_speed_mhz = Get-SafeValue $proc.MaxClockSpeed 0
+                current_clock_speed_mhz = Get-SafeValue $proc.CurrentClockSpeed 0
+                architecture = switch ($proc.Architecture) {
+                    0 { "x86" }
+                    6 { "Intel Itanium" }
+                    9 { "x64" }
+                    default { "Unknown" }
+                }
+                l2_cache_size_kb = Get-SafeValue $proc.L2CacheSize 0
+                l3_cache_size_kb = Get-SafeValue $proc.L3CacheSize 0
+            }
+        }
     } catch {
         $processors = @{error = "Failed to get processor info: $($_.Exception.Message)"}
     }
     
-    # Physical Memory (RAM Modules)
+    # Memory Information
     try {
-        $memory = Get-CimInstance Win32_PhysicalMemory -ErrorAction Stop | Select-Object Capacity, Manufacturer, Speed, PartNumber, SerialNumber
+        $memoryInfo = Get-CimInstance Win32_PhysicalMemory -ErrorAction Stop
+        $memory = @()
+        foreach ($mem in $memoryInfo) {
+            $memory += @{
+                capacity_gb = Convert-BytesToGB $mem.Capacity
+                manufacturer = Get-SafeValue $mem.Manufacturer
+                speed_mhz = Get-SafeValue $mem.Speed 0
+                memory_type = switch ($mem.MemoryType) {
+                    20 { "DDR" }
+                    21 { "DDR2" }
+                    24 { "DDR3" }
+                    26 { "DDR4" }
+                    default { "Unknown" }
+                }
+                form_factor = switch ($mem.FormFactor) {
+                    8 { "DIMM" }
+                    12 { "SO-DIMM" }
+                    default { "Unknown" }
+                }
+                bank_label = Get-SafeValue $mem.BankLabel
+            }
+        }
     } catch {
         $memory = @{error = "Failed to get memory info: $($_.Exception.Message)"}
     }
     
-    # BIOS Info
+    # Storage Information
     try {
-        $bios = Get-CimInstance Win32_BIOS -ErrorAction Stop | Select-Object Manufacturer, SerialNumber, SMBIOSBIOSVersion, ReleaseDate
+        $logicalDiskInfo = Get-CimInstance Win32_LogicalDisk | Where-Object { $_.DriveType -eq 3 } -ErrorAction Stop
+        $logicalDisks = @()
+        foreach ($disk in $logicalDiskInfo) {
+            $logicalDisks += @{
+                drive_letter = Get-SafeValue $disk.DeviceID
+                file_system = Get-SafeValue $disk.FileSystem
+                size_gb = Convert-BytesToGB $disk.Size
+                free_gb = Convert-BytesToGB $disk.FreeSpace
+                free_percent = if ($disk.Size -gt 0) { [math]::Round(($disk.FreeSpace / $disk.Size) * 100, 2) } else { 0 }
+            }
+        }
+        
+        $physicalDiskInfo = Get-CimInstance Win32_DiskDrive -ErrorAction Stop
+        $physicalDisks = @()
+        foreach ($disk in $physicalDiskInfo) {
+            $physicalDisks += @{
+                model = Get-SafeValue $disk.Model
+                interface_type = Get-SafeValue $disk.InterfaceType
+                size_gb = Convert-BytesToGB $disk.Size
+                media_type = Get-SafeValue $disk.MediaType
+            }
+        }
+        
+        $storage = @{
+            logical_disks = $logicalDisks
+            physical_disks = $physicalDisks
+        }
     } catch {
-        $bios = @{error = "Failed to get BIOS info: $($_.Exception.Message)"}
+        $storage = @{error = "Failed to get storage info: $($_.Exception.Message)"}
     }
     
-    # Motherboard / Baseboard
+    # Graphics Information
     try {
-        $motherboard = Get-CimInstance Win32_BaseBoard -ErrorAction Stop | Select-Object Manufacturer, Product, SerialNumber
-    } catch {
-        $motherboard = @{error = "Failed to get motherboard info: $($_.Exception.Message)"}
-    }
-    
-    # Logical Disks (Volumes)
-    try {
-        $logicalDisks = Get-CimInstance Win32_LogicalDisk -ErrorAction Stop | Where-Object { $_.DriveType -eq 3 } | 
-            Select-Object DeviceID, VolumeName, 
-                @{Name="SizeGB";Expression={if ($_.Size) {[math]::Round($_.Size / 1GB, 2)} else {0}}}, 
-                @{Name="FreeGB";Expression={if ($_.FreeSpace) {[math]::Round($_.FreeSpace / 1GB, 2)} else {0}}}
-    } catch {
-        $logicalDisks = @{error = "Failed to get logical disk info: $($_.Exception.Message)"}
-    }
-    
-    # Physical Disks
-    try {
-        $physicalDisks = Get-CimInstance Win32_DiskDrive -ErrorAction Stop | Select-Object Model, InterfaceType, 
-            @{Name="SizeGB";Expression={if ($_.Size) {[math]::Round($_.Size / 1GB, 2)} else {0}}}
-    } catch {
-        $physicalDisks = @{error = "Failed to get physical disk info: $($_.Exception.Message)"}
-    }
-    
-    # GPU / Video Controller
-    try {
-        $gpus = Get-CimInstance Win32_VideoController -ErrorAction Stop | Select-Object Name, DriverVersion, 
-            @{Name="AdapterRAMGB";Expression={if ($_.AdapterRAM -and $_.AdapterRAM -gt 0) {[math]::Round($_.AdapterRAM / 1GB, 2)} else {0}}}
+        $gpuInfo = Get-CimInstance Win32_VideoController -ErrorAction Stop
+        $gpus = @()
+        foreach ($gpu in $gpuInfo) {
+            $gpus += @{
+                name = Get-SafeValue $gpu.Name
+                adapter_ram_gb = Convert-BytesToGB $gpu.AdapterRAM
+                driver_version = Get-SafeValue $gpu.DriverVersion
+                current_horizontal_resolution = Get-SafeValue $gpu.CurrentHorizontalResolution 0
+                current_vertical_resolution = Get-SafeValue $gpu.CurrentVerticalResolution 0
+            }
+        }
     } catch {
         $gpus = @{error = "Failed to get GPU info: $($_.Exception.Message)"}
     }
     
-    # Network Adapters
+    # Network Information (basic, non-sensitive)
     try {
-        $networkAdapters = Get-CimInstance Win32_NetworkAdapterConfiguration -ErrorAction Stop | Where-Object { $_.IPEnabled -eq $true } |
-            Select-Object Description, MACAddress, IPAddress, DefaultIPGateway, DNSServerSearchOrder
-    } catch {
-        $networkAdapters = @{error = "Failed to get network adapter info: $($_.Exception.Message)"}
-    }
-    
-    # Battery Info (if available)
-    try {
-        $battery = Get-CimInstance Win32_Battery -ErrorAction Stop | Select-Object Name, EstimatedChargeRemaining, BatteryStatus, DesignVoltage
-        if (-not $battery) {
-            $battery = @{info = "No battery detected (desktop system)"}
+        $networkInfo = Get-CimInstance Win32_NetworkAdapterConfiguration | Where-Object { $_.IPEnabled -eq $true } -ErrorAction Stop
+        $networkAdapters = @()
+        foreach ($adapter in $networkInfo) {
+            $networkAdapters += @{
+                description = Get-SafeValue $adapter.Description
+                dhcp_enabled = Get-SafeValue $adapter.DHCPEnabled $false
+                ip_count = if ($adapter.IPAddress) { $adapter.IPAddress.Count } else { 0 }
+            }
         }
     } catch {
-        $battery = @{error = "Failed to get battery info: $($_.Exception.Message)"}
+        $networkAdapters = @{error = "Failed to get network info: $($_.Exception.Message)"}
     }
     
-    # Build the complete system info object
+    # Build system info object
     $systemInfo = @{
         timestamp = $timestamp
         system = @{
             operating_system = $os
             computer_system = $computer
+        }
+        hardware = @{
             processors = $processors
             memory_modules = $memory
-            bios = $bios
-            motherboard = $motherboard
         }
-        storage = @{
-            logical_disks = $logicalDisks
-            physical_disks = $physicalDisks
-        }
+        storage = $storage
         graphics = @{
-            gpus = $gpus
+            video_controllers = $gpus
         }
         network = @{
             adapters = $networkAdapters
         }
-        power = @{
-            battery = $battery
-        }
     }
     
-    # Convert to JSON with proper depth and formatting
-    $json = $systemInfo | ConvertTo-Json -Depth 10 -Compress
-    Write-Output $json
+    $systemInfo | ConvertTo-Json -Depth 10 -Compress
     
 } catch {
     $errorObj = @{
         error = "PowerShell execution error: $($_.Exception.Message)"
-        line = if ($_.InvocationInfo.ScriptLineNumber) { $_.InvocationInfo.ScriptLineNumber } else { "Unknown" }
-        position = if ($_.InvocationInfo.OffsetInLine) { $_.InvocationInfo.OffsetInLine } else { "Unknown" }
+        timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
     }
     Write-Output ($errorObj | ConvertTo-Json -Compress)
     exit 1
 }
 '''
 
-def run_embedded_powershell_script():
-    """Create temporary PowerShell script and run it with better error handling"""
+def anonymize_sensitive_data(value: str) -> str:
+    """Hash sensitive data for privacy while maintaining uniqueness"""
+    if not value or value.lower() in ['unknown', 'n/a', '']:
+        return value
+    return hashlib.sha256(value.encode()).hexdigest()[:16]
+
+def run_powershell_script() -> Dict[str, Any]:
+    """Execute PowerShell script with improved error handling"""
     try:
-        # Create temporary file
         with tempfile.NamedTemporaryFile(mode='w', suffix='.ps1', delete=False, encoding='utf-8') as temp_file:
             temp_file.write(POWERSHELL_SCRIPT)
             temp_script_path = temp_file.name
         
         try:
-            # Run PowerShell with better parameters
+            logger.info("Executing PowerShell script...")
             result = subprocess.run([
                 "powershell", 
                 "-ExecutionPolicy", "Bypass", 
                 "-NoProfile", 
                 "-NonInteractive",
                 "-File", temp_script_path
-            ], capture_output=True, text=True, timeout=30)
-            
-            print(f"[DEBUG] PowerShell exit code: {result.returncode}")
-            print(f"[DEBUG] PowerShell stdout: {result.stdout[:500]}...")
-            print(f"[DEBUG] PowerShell stderr: {result.stderr[:500]}...")
+            ], capture_output=True, text=True, timeout=60)
             
             if result.returncode != 0:
-                return {"error": f"PowerShell script failed with exit code {result.returncode}: {result.stderr}"}
+                logger.error(f"PowerShell failed with exit code {result.returncode}")
+                return {"error": f"PowerShell script failed: {result.stderr}"}
             
-            # Clean the output - remove any extra whitespace or non-JSON content
+            # Parse JSON output
             output = result.stdout.strip()
-            
-            # Find the JSON content (in case there are other messages)
             json_start = output.find('{')
             json_end = output.rfind('}') + 1
             
@@ -190,42 +273,25 @@ def run_embedded_powershell_script():
                 return {"error": "No valid JSON found in PowerShell output"}
                 
         finally:
-            # Clean up temporary file
             try:
                 os.unlink(temp_script_path)
             except:
                 pass
                 
     except subprocess.TimeoutExpired:
+        logger.error("PowerShell script execution timed out")
         return {"error": "PowerShell script execution timed out"}
-    except subprocess.CalledProcessError as e:
-        print("[!] PowerShell execution failed:\n", e.stderr)
-        return {"error": f"PowerShell script execution failed: {e.stderr}"}
     except json.JSONDecodeError as e:
-        print("[!] PowerShell returned invalid JSON:")
-        print(f"Output: {result.stdout}")
-        print(f"Error: {e}")
+        logger.error(f"Invalid JSON from PowerShell: {e}")
         return {"error": f"Invalid JSON from PowerShell: {str(e)}"}
     except Exception as e:
-        print("[!] Error running PowerShell script:", str(e))
+        logger.error(f"PowerShell script error: {e}")
         return {"error": f"PowerShell script error: {str(e)}"}
 
-def get_ip_address():
-    """Get the current machine's non-localhost IP"""
+def get_python_system_info() -> Dict[str, Any]:
+    """Collect system information using Python libraries"""
     try:
-        ip = socket.gethostbyname(socket.getfqdn())
-        if ip.startswith("127."):
-            # fallback using socket connect
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-                s.connect(("8.8.8.8", 80))
-                ip = s.getsockname()[0]
-        return ip
-    except Exception:
-        return "127.0.0.1"
-
-def collect_python_system_info():
-    """Collect system information using Python"""
-    try:
+        # Get disk information
         disk_info = []
         for partition in psutil.disk_partitions():
             try:
@@ -234,131 +300,164 @@ def collect_python_system_info():
                     "device": partition.device,
                     "mountpoint": partition.mountpoint,
                     "fstype": partition.fstype,
-                    "total_size": round(usage.total / (1024 ** 3), 2),
-                    "used": round(usage.used / (1024 ** 3), 2),
-                    "free": round(usage.free / (1024 ** 3), 2)
+                    "total_size_gb": round(usage.total / (1024 ** 3), 2),
+                    "used_gb": round(usage.used / (1024 ** 3), 2),
+                    "free_gb": round(usage.free / (1024 ** 3), 2),
+                    "usage_percent": round((usage.used / usage.total) * 100, 2) if usage.total > 0 else 0
                 })
-            except Exception:
+            except (PermissionError, FileNotFoundError):
                 continue
+
+        # Get network interface info (non-sensitive)
+        network_stats = psutil.net_if_stats()
+        network_info = []
+        for interface, stats in network_stats.items():
+            if stats.isup:
+                network_info.append({
+                    "interface": interface,
+                    "is_up": stats.isup,
+                    "speed_mbps": stats.speed if stats.speed > 0 else None,
+                    "mtu": stats.mtu
+                })
+
+        # Get basic system info
+        hostname = socket.gethostname()
+        if ANONYMIZE_DATA:
+            hostname = anonymize_sensitive_data(hostname)
 
         return {
             "timestamp": datetime.now().isoformat(),
+            "collection_method": "python",
             "system": {
-                "hostname": socket.gethostname(),
+                "hostname": hostname,
                 "os": platform.system(),
                 "os_version": platform.version(),
                 "os_release": platform.release(),
                 "architecture": platform.machine(),
                 "processor": platform.processor(),
-                "host_id": str(uuid.getnode())
+                "python_version": platform.python_version()
             },
             "hardware": {
-                "cpu_cores": psutil.cpu_count(logical=False),
-                "cpu_threads": psutil.cpu_count(logical=True),
-                "cpu_usage": psutil.cpu_percent(interval=1),
-                "total_ram": round(psutil.virtual_memory().total / (1024 ** 3), 2),
-                "available_ram": round(psutil.virtual_memory().available / (1024 ** 3), 2),
-                "disk_info": disk_info
+                "cpu_cores_physical": psutil.cpu_count(logical=False),
+                "cpu_cores_logical": psutil.cpu_count(logical=True),
+                "cpu_usage_percent": psutil.cpu_percent(interval=1),
+                "total_ram_gb": round(psutil.virtual_memory().total / (1024 ** 3), 2),
+                "available_ram_gb": round(psutil.virtual_memory().available / (1024 ** 3), 2),
+                "ram_usage_percent": psutil.virtual_memory().percent
+            },
+            "storage": {
+                "disk_partitions": disk_info
             },
             "network": {
-                "ip_address": get_ip_address(),
-                "mac_address": ':'.join(['{:02x}'.format((uuid.getnode() >> ele) & 0xff)
-                                        for ele in range(0, 2 * 6, 2)][::-1])
+                "interfaces": network_info
+            },
+            "process_info": {
+                "total_processes": len(psutil.pids()),
+                "boot_time": datetime.fromtimestamp(psutil.boot_time()).isoformat()
             }
         }
 
     except Exception as e:
-        print("[!] Error collecting system info:", str(e))
-        return {"error": f"System info collection failed: {str(e)}"}
+        logger.error(f"Error collecting Python system info: {e}")
+        return {"error": f"Python system info collection failed: {str(e)}"}
 
-def merge_data(python_data, powershell_data):
-    """Merge Python and PowerShell data"""
-    return {
-        "agent_source": "SpecScoreX Agent",
+def apply_privacy_filters(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply privacy filters to sensitive data if anonymization is enabled"""
+    if not ANONYMIZE_DATA:
+        return data
+    
+    logger.info("Applying privacy filters to sensitive data...")
+    
+    def anonymize_recursive(obj):
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                if key.lower() in ['serial_number', 'mac_address', 'hostname', 'name', 'username']:
+                    if isinstance(value, str):
+                        obj[key] = anonymize_sensitive_data(value)
+                elif isinstance(value, (dict, list)):
+                    anonymize_recursive(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                anonymize_recursive(item)
+    
+    anonymize_recursive(data)
+    return data
+
+def send_data_to_api(data: Dict[str, Any], retries: int = 3) -> bool:
+    """Send data to API with retry logic and better error handling"""
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'SpecScoreX-Agent/1.0'
+    }
+    
+    for attempt in range(1, retries + 1):
+        try:
+            logger.info(f"Sending data to API (attempt {attempt}/{retries})...")
+            response = requests.post(
+                API_ENDPOINT, 
+                json=data, 
+                headers=headers, 
+                timeout=30,
+                verify=True  # Ensure SSL certificate verification
+            )
+            response.raise_for_status()
+            
+            logger.info("Data sent successfully to API")
+            logger.info(f"Server response: {response.text[:200]}...")
+            return True
+            
+        except requests.exceptions.Timeout:
+            logger.warning(f"API request timeout on attempt {attempt}")
+        except requests.exceptions.ConnectionError:
+            logger.warning(f"Connection error on attempt {attempt}")
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"HTTP error on attempt {attempt}: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Server response: {e.response.text}")
+        except Exception as e:
+            logger.error(f"Unexpected error on attempt {attempt}: {e}")
+    
+    logger.error("All API send attempts failed")
+    return False
+
+def main():
+    """Main execution function"""
+    logger.info("Starting enhanced system information collector...")
+    logger.info(f"Anonymization: {'ENABLED' if ANONYMIZE_DATA else 'DISABLED'}")
+    
+    # Collect data from both sources
+    python_data = get_python_system_info()
+    powershell_data = run_powershell_script()
+    
+    # Merge the data
+    final_data = {
+        "agent_info": {
+            "name": "SpecScoreX Enhanced Agent",
+            "version": "2.0",
+            "timestamp": datetime.now().isoformat(),
+            "privacy_mode": ANONYMIZE_DATA
+        },
         "python_collected": python_data,
         "powershell_collected": powershell_data
     }
-
-def send_to_backend(data, retries=3):
-    """Send merged data to backend with retry support"""
-    headers = {'Content-Type': 'application/json'}
-    for attempt in range(1, retries + 1):
-        try:
-            response = requests.post(API_ENDPOINT, json=data, headers=headers, timeout=10)
-            response.raise_for_status()
-            print("[+] Data sent successfully.")
-            print("[Server Response]:", response.text)
-            return True
-        except requests.exceptions.RequestException as e:
-            print(f"[!] Attempt {attempt} failed: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                print("[Server Response]:", e.response.text)
     
-    print("[!] All attempts to send data failed.")
-    return False
-
-def test_powershell_directly():
-    """Test PowerShell execution directly for debugging"""
-    print("[*] Testing PowerShell execution...")
+    # Apply privacy filters
+    final_data = apply_privacy_filters(final_data)
     
-    # Simple test script
-    test_script = '''
-    try {
-        $info = @{
-            test = "success"
-            timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
-        }
-        $info | ConvertTo-Json -Compress
-    } catch {
-        Write-Output "Error: $($_.Exception.Message)"
-    }
-    '''
-    
-    try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.ps1', delete=False, encoding='utf-8') as temp_file:
-            temp_file.write(test_script)
-            temp_script_path = temp_file.name
-        
-        result = subprocess.run([
-            "powershell", 
-            "-ExecutionPolicy", "Bypass", 
-            "-NoProfile", 
-            "-NonInteractive",
-            "-File", temp_script_path
-        ], capture_output=True, text=True, timeout=10)
-        
-        print(f"[DEBUG] Test exit code: {result.returncode}")
-        print(f"[DEBUG] Test stdout: {result.stdout}")
-        print(f"[DEBUG] Test stderr: {result.stderr}")
-        
-        os.unlink(temp_script_path)
-        
-        if result.returncode == 0:
-            print("[+] PowerShell test successful!")
-            return True
+    if SEND_TO_API:
+        success = send_data_to_api(final_data)
+        if success:
+            logger.info("Opening results page...")
+            try:
+                import webbrowser
+                webbrowser.open("https://specscorex.onrender.com/report")
+            except Exception as e:
+                logger.warning(f"Could not open browser: {e}")
         else:
-            print("[!] PowerShell test failed!")
-            return False
-            
-    except Exception as e:
-        print(f"[!] PowerShell test error: {e}")
-        return False
+            logger.error("Failed to send data to API")
+    else:
+        logger.info("Debug mode - displaying collected data:")
+        print(json.dumps(final_data, indent=2, default=str))
 
 if __name__ == "__main__":
-    print("[*] Starting system info agent...")
-    
-    # Test PowerShell first
-    if not test_powershell_directly():
-        print("[!] PowerShell test failed. Continuing with Python-only data...")
-    
-    python_info = collect_python_system_info()
-    powershell_info = run_embedded_powershell_script()
-    final_data = merge_data(python_info, powershell_info)
-
-    if SEND_TO_API:
-        if send_to_backend(final_data):
-            import webbrowser
-            webbrowser.open("https://specscorex.onrender.com/report")
-    else:
-        print("[*] Debug Mode Output:\n")
-        print(json.dumps(final_data, indent=2))
+    main()
