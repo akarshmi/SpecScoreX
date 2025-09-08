@@ -5,7 +5,7 @@ a = Analysis(
     ['spec_collector.py'],
     pathex=[],
     binaries=[],
-    datas=[('spec_collector.ps1', '.')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
